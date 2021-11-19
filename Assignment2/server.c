@@ -4,6 +4,7 @@
 #include <stdlib.h> 
 #include <netinet/in.h> 
 #include <string.h> 
+#include <pwd.h>
 #define PORT 8080 
 int main(int argc, char const *argv[]) 
 { 
@@ -16,10 +17,9 @@ int main(int argc, char const *argv[])
 	pid_t fpid = 0;
 	char *user = "nobody";
 	struct passwd *pwd;
-	
-	// Original
+// parent
 	if (argc == 1){
-		printf("Parent start\n");
+		printf("Parent started\n");
 		
 		// Creating socket file descriptor 
 		if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) 
@@ -29,7 +29,7 @@ int main(int argc, char const *argv[])
 		} 
 		   
 		// Forcefully attaching socket to the port 8080 
-		if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, 
+		if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, 
 													  &opt, sizeof(opt))) 
 		{ 
 			perror("setsockopt"); 
@@ -58,28 +58,40 @@ int main(int argc, char const *argv[])
 			exit(EXIT_FAILURE); 
 		} 
 		
-		// Fork for privilege separation
+		
 		printf("Fork\n");
 		pid_t fpid = fork();
 		
 		if (fpid == 0){
-            if ((pwd = getpwnam(user)) == NULL)
+			if ((pwd = getpwnam(user)) == NULL)
             {
                 perror("Cannot find UID for nobody");
             }
             setuid(pwd->pw_uid);
-			valread = read( new_socket , buffer, 1024); 
-			printf("%s\n",buffer ); 
-			send(new_socket , hello , strlen(hello) , 0 ); 
-			printf("Hello message sent\n"); 
-			printf("\nFork: child done\n"
-		}
-		
+			printf("Droped privilege to the “nobody” user\n");
+			char char_socket[12];
+			sprintf(char_socket, "%d", new_socket);
+			char *args[] = {"./server", char_socket, NULL};
+			execvp(args[0], args);
+		}		
 		else{
 			int status = 0;
 			while ((wait(&status) > 0));
 			printf("Parent done\n");
 		}
-	return 0;	
+		
+	}
+	//Child job
+	else{
+		new_socket = atoi(argv[1]);
+		printf("Child start\n");
+		new_socket = atoi(argv[1]);
+		valread = read( new_socket , buffer, 1024); 
+		printf("%s\n",buffer ); 
+		send(new_socket , hello , strlen(hello) , 0 ); 
+		printf("Hello message sent\n"); 	
+		printf("\nChild done\n");
 	}
 	
+    return 0; 
+} 
